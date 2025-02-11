@@ -53,6 +53,8 @@ jobs:
           python3 $(which ogrmerge.py) -single \
             -f FlatGeobuf \
             -o processed/merged.fgb \
+            -skipfailures \
+            -progress \
             source/*.geojson source/*.fgb || echo "No source files found"
 
       - name: Rename attributes if list.csv exists
