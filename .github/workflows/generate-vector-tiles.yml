@@ -1,0 +1,348 @@
+name: Generate Vector Tiles
+
+on:
+  push:
+    paths:
+      - 'source/**'
+  workflow_dispatch:
+    inputs:
+      is_production:
+        description: 'Production build (if false, creates test build)'
+        required: true
+        type: boolean
+        default: false
+
+env:
+  TIMESTAMP: $(date +'%Y%m%d_%H%M%S')
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pages: write
+      id-token: write
+    
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup GDAL
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y gdal-bin python3-pip
+          pip3 install pandas
+
+      - name: Setup tippecanoe
+        run: |
+          git clone https://github.com/felt/tippecanoe.git
+          cd tippecanoe
+          make -j
+          sudo make install
+
+      - name: Create directory structure
+        run: |
+          mkdir -p processed
+          mkdir -p _site
+
+      - name: Set timestamp
+        run: |
+          echo "TIMESTAMP=$(date +'%Y%m%d_%H%M%S')" >> $GITHUB_ENV
+
+      - name: Merge GeoJSON and FlatGeobuf files
+        run: |
+          python3 $(which ogrmerge.py) -single \
+            -f FlatGeobuf \
+            -o processed/merged.fgb \
+            source/*.geojson source/*.fgb || echo "No source files found"
+
+      - name: Rename attributes if list.csv exists
+        run: |
+          if [ -f "source/list.csv" ]; then
+            python3 - << 'EOF'
+          import pandas as pd
+          import subprocess
+          import os
+          
+          # CSVファイルの読み込み
+          rename_df = pd.read_csv('source/list.csv', header=0)
+          
+          # SQLクエリの構築
+          select_parts = []
+          for _, row in rename_df.iterrows():
+              old_name = row.iloc[0]
+              new_name = row.iloc[1]
+              select_parts.append(f"{old_name} as {new_name}")
+          
+          # 変更対象外の属性を取得
+          output = subprocess.check_output(['ogrinfo', '-so', 'processed/merged.fgb']).decode('utf-8')
+          all_fields = []
+          for line in output.split('\n'):
+              if ': ' in line and not line.startswith('INFO'):
+                  field_name = line.split(':')[0].strip()
+                  all_fields.append(field_name)
+          
+          # 変更対象外の属性をそのまま追加
+          old_names = rename_df.iloc[:, 0].tolist()
+          unchanged_fields = [f for f in all_fields if f not in old_names]
+          select_parts.extend(unchanged_fields)
+          
+          # SQL文の作成
+          sql = f"SELECT geometry, {', '.join(select_parts)} FROM merged"
+          
+          # 属性名変更済みのFlatGeobufファイルを作成
+          subprocess.run([
+              'ogr2ogr',
+              '-f', 'FlatGeobuf',
+              'processed/merged_renamed.fgb',
+              'processed/merged.fgb',
+              '-dialect', 'sqlite',
+              '-sql', sql,
+              '-nln', 'merged'
+          ])
+          
+          # 元のファイルを置き換え
+          os.replace('processed/merged_renamed.fgb', 'processed/merged.fgb')
+          EOF
+          fi
+
+      - name: Generate tiles
+        run: |
+          # 出力ディレクトリの設定
+          BASE_TILES_DIR="processed/tiles"
+          mkdir -p "$BASE_TILES_DIR"
+
+          # 詳細レイヤー（ズームレベル14）
+          DETAIL_DIR="$BASE_TILES_DIR/detail_temp"
+          mkdir -p "$DETAIL_DIR"
+          tippecanoe -e "$DETAIL_DIR" \
+            --no-tile-compression \
+            -z14 -Z14 \
+            --no-tile-size-limit --no-feature-limit \
+            -l detail \
+            processed/merged.fgb
+
+          # 国有林名称レイヤー（ズームレベル10-13）
+          KOKUYURIN_DIR="$BASE_TILES_DIR/kokuyurin_temp"
+          mkdir -p "$KOKUYURIN_DIR"
+          
+          ogr2ogr -f FlatGeobuf \
+            processed/merged_kokuyurinmeisho_dissolved.fgb \
+            processed/merged.fgb \
+            -dialect sqlite \
+            -sql "SELECT ST_Union(geometry) as geometry, 国有林名称, 計画区名称 FROM merged GROUP BY 国有林名称, 計画区名称"
+
+          tippecanoe -e "$KOKUYURIN_DIR" \
+            --no-tile-compression \
+            -z13 -Z10 \
+            --no-tile-size-limit --no-feature-limit \
+            -l kokuyurinmeisho \
+            --no-simplification-of-shared-nodes \
+            --detect-shared-borders \
+            processed/merged_kokuyurinmeisho_dissolved.fgb
+
+          # 計画区名称レイヤー（ズームレベル2-9）
+          KEIKAKUKU_DIR="$BASE_TILES_DIR/keikakuku_temp"
+          mkdir -p "$KEIKAKUKU_DIR"
+          
+          ogr2ogr -f FlatGeobuf \
+            processed/merged_keikakukumeisho_dissolved.fgb \
+            processed/merged.fgb \
+            -dialect sqlite \
+            -sql "SELECT ST_Union(geometry) as geometry, 計画区名称 FROM merged GROUP BY 計画区名称"
+
+          tippecanoe -e "$KEIKAKUKU_DIR" \
+            --no-tile-compression \
+            -z9 -Z2 \
+            --no-tile-size-limit --no-feature-limit \
+            -l keikakukumeisho \
+            --no-simplification-of-shared-nodes \
+            --detect-shared-borders \
+            processed/merged_keikakukumeisho_dissolved.fgb
+
+          # タイルの統合
+          FINAL_TILES_DIR="$BASE_TILES_DIR/combined"
+          mkdir -p "$FINAL_TILES_DIR"
+          
+          # 各ズームレベルのタイルを適切なディレクトリにコピー
+          cp -r "$DETAIL_DIR"/* "$FINAL_TILES_DIR/"
+          cp -r "$KOKUYURIN_DIR"/* "$FINAL_TILES_DIR/"
+          cp -r "$KEIKAKUKU_DIR"/* "$FINAL_TILES_DIR/"
+          
+          # 一時ディレクトリの削除
+          rm -rf "$DETAIL_DIR" "$KOKUYURIN_DIR" "$KEIKAKUKU_DIR"
+          
+          # 最終的なタイルディレクトリを移動
+          rm -rf "$BASE_TILES_DIR/tiles"
+          mv "$FINAL_TILES_DIR" "$BASE_TILES_DIR/tiles"
+
+          # 各ズームレベルのタイルの最大ファイルサイズを分析
+          echo "Analyzing maximum tile sizes for each zoom level..."
+          {
+            echo "zoom_level,max_size_bytes"
+            for zoom_dir in "$BASE_TILES_DIR"/tiles/*; do
+              if [ -d "$zoom_dir" ]; then
+                zoom_level=$(basename "$zoom_dir")
+                # findコマンドで最大のファイルサイズを取得
+                max_size=$(find "$zoom_dir" -type f -name "*.pbf" -printf "%s\n" | sort -nr | head -n1)
+                if [ ! -z "$max_size" ]; then
+                  echo "$zoom_level,$max_size"
+                fi
+              fi
+            done
+          } > "$BASE_TILES_DIR/tile_sizes.csv"
+
+      - name: Copy tiles to destination
+        run: |
+          if [ "${{ github.event.inputs.is_production }}" = "true" ]; then
+            # 本番用: tilesディレクトリにコピー
+            rm -rf "tiles"
+            mkdir -p "tiles"
+            cp -r processed/tiles/tiles/* "tiles/"
+            cp processed/tiles/tile_sizes.csv "tiles/"
+            
+            # GitHub Pages用（既存の_siteディレクトリを空にする）
+            rm -rf "_site"/*
+            mkdir -p "_site/tiles"
+            cp -r processed/tiles/tiles/* "_site/tiles/"
+            cp processed/tiles/tile_sizes.csv "_site/tiles/"
+          else
+            # テスト用: タイムスタンプ付きディレクトリにコピー
+            TEST_DIR="${{ env.TIMESTAMP }}-tiles"
+            mkdir -p "$TEST_DIR"
+            cp -r processed/tiles/tiles/* "$TEST_DIR/"
+            cp processed/tiles/tile_sizes.csv "$TEST_DIR/"
+            
+            # GitHub Pages用
+            mkdir -p "_site/$TEST_DIR"
+            cp -r processed/tiles/tiles/* "_site/$TEST_DIR/"
+            cp processed/tiles/tile_sizes.csv "_site/$TEST_DIR/"
+          fi
+
+      - name: Generate index page
+        run: |
+          # Create base HTML structure
+          cat > _site/index.html << EOF
+          <!DOCTYPE html>
+          <html>
+          <head>
+            <meta charset="utf-8">
+            <title>Vector Tiles Hosting</title>
+            <style>
+              body { font-family: Arial, sans-serif; margin: 20px; }
+              .tile-list { margin: 20px 0; }
+              .tile-entry { 
+                margin: 10px 0;
+                padding: 10px;
+                background-color: #f5f5f5;
+                border-radius: 4px;
+              }
+              .production { border-left: 4px solid #4CAF50; }
+              .test { border-left: 4px solid #2196F3; }
+              code { 
+                background-color: #e0e0e0;
+                padding: 2px 4px;
+                border-radius: 3px;
+              }
+              .timestamp {
+                color: #666;
+                font-size: 0.9em;
+              }
+              .metadata {
+                margin-top: 5px;
+                font-size: 0.9em;
+              }
+              .metadata a {
+                color: #2196F3;
+                text-decoration: none;
+              }
+              .metadata a:hover {
+                text-decoration: underline;
+              }
+            </style>
+          </head>
+          <body>
+            <h1>Vector Tiles Hosting</h1>
+          EOF
+
+          # 全てのタイルセットを一覧表示する関数
+          list_tile_directories() {
+            for dir in "$1"/*/ ; do
+              if [ -d "$dir" ]; then
+                dir_name=$(basename "$dir")
+                
+                # タイルセットの種類を判断（本番用 or テスト用）
+                if [ "$dir_name" = "tiles" ]; then
+                  entry_class="production"
+                  title="Production Tiles"
+                  url_path="tiles"
+                else
+                  entry_class="test"
+                  title="Test Build"
+                  url_path="$dir_name"
+                fi
+                
+                # タイルセット情報を表示
+                cat >> _site/index.html << EOF
+                <div class="tile-entry ${entry_class}">
+                  <p><strong>${title}</strong>
+                    $([ "$dir_name" != "tiles" ] && echo "<span class=\"timestamp\">(${dir_name%%-tiles})</span>")
+                  </p>
+                  <p>URL: <code>https://$GITHUB_REPOSITORY_OWNER.github.io/${GITHUB_REPOSITORY#*/}/${url_path}/{z}/{x}/{y}.pbf</code></p>
+                  <p class="metadata">
+                    <a href="${url_path}/tile_sizes.csv">Download tile size analysis (CSV)</a>
+                  </p>
+                </div>
+          EOF
+              fi
+            done
+          }
+
+          # タイルセットの一覧を生成
+          cat >> _site/index.html << EOF
+          <div class="tile-list">
+          EOF
+          
+          list_tile_directories "_site"
+          
+          # Close HTML structure
+          cat >> _site/index.html << EOF
+          </div>
+          </body>
+          </html>
+          EOF
+
+      - name: Setup Pages
+        uses: actions/configure-pages@v4
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: '_site'
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
+
+      - name: Commit changes
+        run: |
+          git config --global user.name "GitHub Actions"
+          git config --global user.email "actions@github.com"
+          
+          if [ "${{ github.event.inputs.is_production }}" = "true" ]; then
+            git add tiles/
+            git add tiles/tile_sizes.csv
+          else
+            git add "${{ env.TIMESTAMP }}-tiles/"
+            git add "${{ env.TIMESTAMP }}-tiles/tile_sizes.csv"
+          fi
+          
+          COMMIT_MSG="Update vector tiles - ${{ env.TIMESTAMP }}"
+          
+          if [ "${{ github.event.inputs.is_production }}" = "true" ]; then
+            COMMIT_MSG="${COMMIT_MSG} (Production Build)"
+          else
+            COMMIT_MSG="${COMMIT_MSG} (Test Build)"
+          fi
+          
+          git commit -m "${COMMIT_MSG}" || echo "No changes to commit"
+          git push || echo "No changes to push"
