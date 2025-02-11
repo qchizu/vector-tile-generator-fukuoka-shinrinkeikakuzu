@@ -154,10 +154,10 @@ jobs:
             --no-tile-compression \
             -z13 -Z13 \
             --no-tile-size-limit --no-feature-limit \
-            -l keikakukumeisho \
+            -l ooaza \
             --no-simplification-of-shared-nodes \
             --detect-shared-borders \
-            processed/merged_keikakukumeisho_dissolved.fgb
+            processed/merged_ooaza_dissolved.fgb
 
           # タイルの統合
           FINAL_TILES_DIR="$BASE_TILES_DIR/combined"
