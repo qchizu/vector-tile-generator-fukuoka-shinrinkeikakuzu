@@ -111,48 +111,48 @@ jobs:
           BASE_TILES_DIR="processed/tiles"
           mkdir -p "$BASE_TILES_DIR"
 
-          # 詳細レイヤー（ズームレベル14）
+          # 詳細レイヤー（ズームレベル15）
           DETAIL_DIR="$BASE_TILES_DIR/detail_temp"
           mkdir -p "$DETAIL_DIR"
           tippecanoe -e "$DETAIL_DIR" \
             --no-tile-compression \
-            -z14 -Z14 \
+            -z15 -Z15 \
             --no-tile-size-limit --no-feature-limit \
             -l detail \
             processed/merged.fgb
 
-          # 国有林名称レイヤー（ズームレベル10-13）
-          KOKUYURIN_DIR="$BASE_TILES_DIR/kokuyurin_temp"
-          mkdir -p "$KOKUYURIN_DIR"
+          # 字レイヤー（ズームレベル14）
+          AZA_DIR="$BASE_TILES_DIR/aza_temp"
+          mkdir -p "$AZA_DIR"
           
           ogr2ogr -f FlatGeobuf \
-            processed/merged_kokuyurinmeisho_dissolved.fgb \
+            processed/merged_aza_dissolved.fgb \
             processed/merged.fgb \
             -dialect sqlite \
-            -sql "SELECT ST_Union(geometry) as geometry, 国有林名称, 計画区名称 FROM merged GROUP BY 国有林名称, 計画区名称"
+            -sql "SELECT ST_Union(geometry) as geometry, aza, ooaza_name, city_name FROM merged GROUP BY aza, ooaza_name, city_name"
 
-          tippecanoe -e "$KOKUYURIN_DIR" \
+          tippecanoe -e "$AZA_DIR" \
             --no-tile-compression \
-            -z13 -Z10 \
+            -z14 -Z14 \
             --no-tile-size-limit --no-feature-limit \
-            -l kokuyurinmeisho \
+            -l aza \
             --no-simplification-of-shared-nodes \
             --detect-shared-borders \
-            processed/merged_kokuyurinmeisho_dissolved.fgb
+            processed/merged_aza_dissolved.fgb
 
-          # 計画区名称レイヤー（ズームレベル2-9）
-          KEIKAKUKU_DIR="$BASE_TILES_DIR/keikakuku_temp"
-          mkdir -p "$KEIKAKUKU_DIR"
+          # 大字レイヤー（ズームレベル）
+          OOAZA_DIR="$BASE_TILES_DIR/ooaza_temp"
+          mkdir -p "$OOAZA_DIR"
           
           ogr2ogr -f FlatGeobuf \
-            processed/merged_keikakukumeisho_dissolved.fgb \
+            processed/merged_ooaza_dissolved.fgb \
             processed/merged.fgb \
             -dialect sqlite \
-            -sql "SELECT ST_Union(geometry) as geometry, 計画区名称 FROM merged GROUP BY 計画区名称"
+            -sql "SELECT ST_Union(geometry) as geometry, ooaza_name, city_name FROM merged GROUP BY ooaza_name, city_name"
 
-          tippecanoe -e "$KEIKAKUKU_DIR" \
+          tippecanoe -e "$OOAZA_DIR" \
             --no-tile-compression \
-            -z9 -Z2 \
+            -z13 -Z13 \
             --no-tile-size-limit --no-feature-limit \
             -l keikakukumeisho \
             --no-simplification-of-shared-nodes \
@@ -165,11 +165,11 @@ jobs:
           
           # 各ズームレベルのタイルを適切なディレクトリにコピー
           cp -r "$DETAIL_DIR"/* "$FINAL_TILES_DIR/"
-          cp -r "$KOKUYURIN_DIR"/* "$FINAL_TILES_DIR/"
-          cp -r "$KEIKAKUKU_DIR"/* "$FINAL_TILES_DIR/"
+          cp -r "$AZA_DIR"/* "$FINAL_TILES_DIR/"
+          cp -r "$OOAZA_DIR"/* "$FINAL_TILES_DIR/"
           
           # 一時ディレクトリの削除
-          rm -rf "$DETAIL_DIR" "$KOKUYURIN_DIR" "$KEIKAKUKU_DIR"
+          rm -rf "$DETAIL_DIR" "$AZA_DIR" "$OOAZA_DIR"
           
           # 最終的なタイルディレクトリを移動
           rm -rf "$BASE_TILES_DIR/tiles"
