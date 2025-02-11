@@ -50,12 +50,28 @@ jobs:
 
       - name: Merge GeoJSON and FlatGeobuf files
         run: |
+          mkdir -p processed/normalized
+          
+          # GeoJSONとFGBファイルを両方MULTIPOLYGONとして変換
+          for file in source/*.{geojson,fgb}; do
+            if [ -f "$file" ]; then
+              filename=$(basename "$file")
+              extension="${filename##*.}"
+              basename="${filename%.*}"
+              
+              ogr2ogr -f FlatGeobuf \
+                -nlt MULTIPOLYGON \
+                "processed/normalized/${basename}_normalized.fgb" \
+                "$file"
+            fi
+          done
+          
+          # 変換済みのFGBファイルを結合
           python3 $(which ogrmerge.py) -single \
             -f FlatGeobuf \
             -o processed/merged.fgb \
-            -skipfailures \
             -progress \
-            source/*.geojson source/*.fgb || echo "No source files found"
+            processed/normalized/*.fgb || echo "No source files found"
 
       - name: Rename attributes if list.csv exists
         run: |
