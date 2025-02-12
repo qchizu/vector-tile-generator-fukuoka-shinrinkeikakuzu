@@ -1,4 +1,4 @@
-# ワークフローファイル: .github/workflows/generate-tiles.yml
+# .github/workflows/generate-tiles.yml
 name: Generate Vector Tiles
 
 on:
@@ -132,6 +132,7 @@ jobs:
           import subprocess
           import os
           import sys
+          import shutil
           
           def create_dissolved_layer(input_file, output_file, group_fields, layer_name):
               # グループ化フィールドをカンマ区切りの文字列に変換
@@ -157,6 +158,9 @@ jobs:
               return output_file
           
           def generate_tile_layer(input_file, output_dir, layer_name, min_zoom, max_zoom, options=None):
+              # metadata.jsonの名前をレイヤー固有のものにする
+              metadata_name = f"metadata_{layer_name}.json"
+              
               # 基本的なtippecanoeオプション
               tippecanoe_cmd = [
                   'tippecanoe',
@@ -165,7 +169,8 @@ jobs:
                   f'-z{max_zoom}', f'-Z{min_zoom}',
                   '--no-tile-size-limit',
                   '--no-feature-limit',
-                  '-l', layer_name
+                  '-l', layer_name,
+                  '--metadata', metadata_name
               ]
               
               # 追加オプションがある場合は追加
@@ -263,6 +268,16 @@ jobs:
                       if result.stdout:
                           max_size = max(map(int, result.stdout.strip().split('\n')))
                           f.write(f"{zoom_dir},{max_size}\n")
+          
+          # 設定ファイルをタイルディレクトリにコピー
+          shutil.copy2('config/tiles.yml', f"{base_tiles_dir}/tiles/tiles.yml")
+          
+          # 各レイヤーのmetadata.jsonファイルを移動
+          for layer in config['layers']:
+              metadata_src = f"metadata_{layer['name']}.json"
+              if os.path.exists(metadata_src):
+                  shutil.copy2(metadata_src, f"{base_tiles_dir}/tiles/metadata_{layer['name']}.json")
+                  os.remove(metadata_src)  # 元のファイルを削除
           EOF
 
       - name: Copy tiles to destination
@@ -273,117 +288,32 @@ jobs:
             mkdir -p "tiles"
             cp -r processed/tiles/tiles/* "tiles/"
             cp processed/tiles/tile_sizes.csv "tiles/"
+            cp processed/tiles/tiles/tiles.yml "tiles/"
+            cp processed/tiles/tiles/metadata_*.json "tiles/" 2>/dev/null || true
             
             # GitHub Pages用（既存の_siteディレクトリを空にする）
             rm -rf "_site"/*
             mkdir -p "_site/tiles"
             cp -r processed/tiles/tiles/* "_site/tiles/"
             cp processed/tiles/tile_sizes.csv "_site/tiles/"
+            cp processed/tiles/tiles/tiles.yml "_site/tiles/"
+            cp processed/tiles/tiles/metadata_*.json "_site/tiles/" 2>/dev/null || true
           else
             # テスト用: タイムスタンプ付きディレクトリにコピー
             TEST_DIR="${{ env.TIMESTAMP }}-tiles"
             mkdir -p "$TEST_DIR"
             cp -r processed/tiles/tiles/* "$TEST_DIR/"
             cp processed/tiles/tile_sizes.csv "$TEST_DIR/"
+            cp processed/tiles/tiles/tiles.yml "$TEST_DIR/"
+            cp processed/tiles/tiles/metadata_*.json "$TEST_DIR/" 2>/dev/null || true
             
             # GitHub Pages用
             mkdir -p "_site/$TEST_DIR"
             cp -r processed/tiles/tiles/* "_site/$TEST_DIR/"
             cp processed/tiles/tile_sizes.csv "_site/$TEST_DIR/"
+            cp processed/tiles/tiles/tiles.yml "_site/$TEST_DIR/"
+            cp processed/tiles/tiles/metadata_*.json "_site/$TEST_DIR/" 2>/dev/null || true
           fi
-
-      - name: Generate index page
-        run: |
-          # Create base HTML structure
-          cat > _site/index.html << EOF
-          <!DOCTYPE html>
-          <html>
-          <head>
-            <meta charset="utf-8">
-            <title>Vector Tiles Hosting</title>
-            <style>
-              body { font-family: Arial, sans-serif; margin: 20px; }
-              .tile-list { margin: 20px 0; }
-              .tile-entry { 
-                margin: 10px 0;
-                padding: 10px;
-                background-color: #f5f5f5;
-                border-radius: 4px;
-              }
-              .production { border-left: 4px solid #4CAF50; }
-              .test { border-left: 4px solid #2196F3; }
-              code { 
-                background-color: #e0e0e0;
-                padding: 2px 4px;
-                border-radius: 3px;
-              }
-              .timestamp {
-                color: #666;
-                font-size: 0.9em;
-              }
-              .metadata {
-                margin-top: 5px;
-                font-size: 0.9em;
-              }
-              .metadata a {
-                color: #2196F3;
-                text-decoration: none;
-              }
-              .metadata a:hover {
-                text-decoration: underline;
-              }
-            </style>
-          </head>
-          <body>
-            <h1>Vector Tiles Hosting</h1>
-          EOF
-
-          # 全てのタイルセットを一覧表示する関数
-          list_tile_directories() {
-            for dir in "$1"/*/ ; do
-              if [ -d "$dir" ]; then
-                dir_name=$(basename "$dir")
-                
-                # タイルセットの種類を判断（本番用 or テスト用）
-                if [ "$dir_name" = "tiles" ]; then
-                  entry_class="production"
-                  title="Production Tiles"
-                  url_path="tiles"
-                else
-                  entry_class="test"
-                  title="Test Build"
-                  url_path="$dir_name"
-                fi
-                
-                # タイルセット情報を表示
-                cat >> _site/index.html << EOF
-                <div class="tile-entry ${entry_class}">
-                  <p><strong>${title}</strong>
-                    $([ "$dir_name" != "tiles" ] && echo "<span class=\"timestamp\">(${dir_name%%-tiles})</span>")
-                  </p>
-                  <p>URL: <code>https://$GITHUB_REPOSITORY_OWNER.github.io/${GITHUB_REPOSITORY#*/}/${url_path}/{z}/{x}/{y}.pbf</code></p>
-                  <p class="metadata">
-                    <a href="${url_path}/tile_sizes.csv">Download tile size analysis (CSV)</a>
-                  </p>
-                </div>
-          EOF
-              fi
-            done
-          }
-
-          # タイルセットの一覧を生成
-          cat >> _site/index.html << EOF
-          <div class="tile-list">
-          EOF
-          
-          list_tile_directories "_site"
-          
-          # Close HTML structure
-          cat >> _site/index.html << EOF
-          </div>
-          </body>
-          </html>
-          EOF
 
       - name: Setup Pages
         uses: actions/configure-pages@v4
