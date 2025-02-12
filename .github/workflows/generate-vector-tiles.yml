@@ -158,9 +158,6 @@ jobs:
               return output_file
           
           def generate_tile_layer(input_file, output_dir, layer_name, min_zoom, max_zoom, options=None):
-              # metadata.jsonの名前をレイヤー固有のものにする
-              metadata_name = f"metadata_{layer_name}.json"
-              
               # 基本的なtippecanoeオプション
               tippecanoe_cmd = [
                   'tippecanoe',
@@ -170,7 +167,7 @@ jobs:
                   '--no-tile-size-limit',
                   '--no-feature-limit',
                   '-l', layer_name,
-                  '--metadata', metadata_name
+                  '--description', layer_name  # レイヤーの説明としてレイヤー名を使用
               ]
               
               # 追加オプションがある場合は追加
@@ -272,12 +269,19 @@ jobs:
           # 設定ファイルをタイルディレクトリにコピー
           shutil.copy2('config/tiles.yml', f"{base_tiles_dir}/tiles/tiles.yml")
           
-          # 各レイヤーのmetadata.jsonファイルを移動
-          for layer in config['layers']:
-              metadata_src = f"metadata_{layer['name']}.json"
-              if os.path.exists(metadata_src):
-                  shutil.copy2(metadata_src, f"{base_tiles_dir}/tiles/metadata_{layer['name']}.json")
-                  os.remove(metadata_src)  # 元のファイルを削除
+          # レイヤー設定情報をJSONとして保存
+          import json
+          layers_info = {
+              'timestamp': os.environ.get('TIMESTAMP', ''),
+              'layers': [{
+                  'name': layer['name'],
+                  'zoom_levels': layer['zoom_levels'],
+                  'dissolve_fields': layer.get('dissolve_fields', []),
+                  'options': layer.get('options', {})
+              } for layer in config['layers']]
+          }
+          with open(f"{base_tiles_dir}/tiles/layers_info.json", 'w') as f:
+              json.dump(layers_info, f, indent=2)
           EOF
 
       - name: Copy tiles to destination
@@ -289,7 +293,7 @@ jobs:
             cp -r processed/tiles/tiles/* "tiles/"
             cp processed/tiles/tile_sizes.csv "tiles/"
             cp processed/tiles/tiles/tiles.yml "tiles/"
-            cp processed/tiles/tiles/metadata_*.json "tiles/" 2>/dev/null || true
+            cp processed/tiles/tiles/layers_info.json "tiles/" 2>/dev/null || true
             
             # GitHub Pages用（既存の_siteディレクトリを空にする）
             rm -rf "_site"/*
@@ -297,7 +301,7 @@ jobs:
             cp -r processed/tiles/tiles/* "_site/tiles/"
             cp processed/tiles/tile_sizes.csv "_site/tiles/"
             cp processed/tiles/tiles/tiles.yml "_site/tiles/"
-            cp processed/tiles/tiles/metadata_*.json "_site/tiles/" 2>/dev/null || true
+            cp processed/tiles/tiles/layers_info.json "_site/tiles/" 2>/dev/null || true
           else
             # テスト用: タイムスタンプ付きディレクトリにコピー
             TEST_DIR="${{ env.TIMESTAMP }}-tiles"
@@ -305,14 +309,14 @@ jobs:
             cp -r processed/tiles/tiles/* "$TEST_DIR/"
             cp processed/tiles/tile_sizes.csv "$TEST_DIR/"
             cp processed/tiles/tiles/tiles.yml "$TEST_DIR/"
-            cp processed/tiles/tiles/metadata_*.json "$TEST_DIR/" 2>/dev/null || true
+            cp processed/tiles/tiles/layers_info.json "$TEST_DIR/" 2>/dev/null || true
             
             # GitHub Pages用
             mkdir -p "_site/$TEST_DIR"
             cp -r processed/tiles/tiles/* "_site/$TEST_DIR/"
             cp processed/tiles/tile_sizes.csv "_site/$TEST_DIR/"
             cp processed/tiles/tiles/tiles.yml "_site/$TEST_DIR/"
-            cp processed/tiles/tiles/metadata_*.json "_site/$TEST_DIR/" 2>/dev/null || true
+            cp processed/tiles/tiles/layers_info.json "_site/$TEST_DIR/" 2>/dev/null || true
           fi
 
       - name: Setup Pages
