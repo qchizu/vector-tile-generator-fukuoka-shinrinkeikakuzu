@@ -1,9 +1,11 @@
+# ワークフローファイル: .github/workflows/generate-tiles.yml
 name: Generate Vector Tiles
 
 on:
   push:
     paths:
       - 'source/**'
+      - 'config/**'
   workflow_dispatch:
     inputs:
       is_production:
@@ -30,7 +32,7 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y gdal-bin python3-pip
-          pip3 install pandas
+          pip3 install pandas pyyaml
 
       - name: Setup tippecanoe
         run: |
@@ -125,89 +127,130 @@ jobs:
 
       - name: Generate tiles
         run: |
+          python3 - << 'EOF'
+          import yaml
+          import subprocess
+          import os
+          import sys
+          
+          def create_dissolved_layer(input_file, output_file, group_fields, layer_name):
+              # グループ化フィールドをカンマ区切りの文字列に変換
+              group_fields_str = ', '.join(group_fields)
+              
+              # SQLクエリの構築
+              sql = f"""
+                  SELECT ST_Union(geometry) as geometry, {group_fields_str}
+                  FROM merged
+                  GROUP BY {group_fields_str}
+              """
+              
+              # ogr2ogrでディゾルブを実行
+              subprocess.run([
+                  'ogr2ogr',
+                  '-f', 'FlatGeobuf',
+                  output_file,
+                  input_file,
+                  '-dialect', 'sqlite',
+                  '-sql', sql
+              ], check=True)
+              
+              return output_file
+          
+          def generate_tile_layer(input_file, output_dir, layer_name, min_zoom, max_zoom, options=None):
+              # 基本的なtippecanoeオプション
+              tippecanoe_cmd = [
+                  'tippecanoe',
+                  '-e', output_dir,
+                  '--no-tile-compression',
+                  f'-z{max_zoom}', f'-Z{min_zoom}',
+                  '--no-tile-size-limit',
+                  '--no-feature-limit',
+                  '-l', layer_name
+              ]
+              
+              # 追加オプションがある場合は追加
+              if options:
+                  if options.get('detect_shared_borders', False):
+                      tippecanoe_cmd.extend(['--detect-shared-borders'])
+                  if options.get('no_simplification_shared_nodes', False):
+                      tippecanoe_cmd.extend(['--no-simplification-of-shared-nodes'])
+              
+              tippecanoe_cmd.append(input_file)
+              
+              # tippecanoeを実行
+              subprocess.run(tippecanoe_cmd, check=True)
+          
+          # 設定ファイルの読み込み
+          try:
+              with open('config/tiles.yml', 'r') as f:
+                  config = yaml.safe_load(f)
+          except FileNotFoundError:
+              print("Error: tiles.yml configuration file not found")
+              sys.exit(1)
+          
           # 出力ディレクトリの設定
-          BASE_TILES_DIR="processed/tiles"
-          mkdir -p "$BASE_TILES_DIR"
-
-          # 詳細レイヤー（ズームレベル15）
-          DETAIL_DIR="$BASE_TILES_DIR/detail_temp"
-          mkdir -p "$DETAIL_DIR"
-          tippecanoe -e "$DETAIL_DIR" \
-            --no-tile-compression \
-            -z15 -Z15 \
-            --no-tile-size-limit --no-feature-limit \
-            -l detail \
-            processed/merged.fgb
-
-          # 字レイヤー（ズームレベル14）
-          AZA_DIR="$BASE_TILES_DIR/aza_temp"
-          mkdir -p "$AZA_DIR"
+          base_tiles_dir = "processed/tiles"
+          os.makedirs(base_tiles_dir, exist_ok=True)
           
-          ogr2ogr -f FlatGeobuf \
-            processed/merged_aza_dissolved.fgb \
-            processed/merged.fgb \
-            -dialect sqlite \
-            -sql "SELECT ST_Union(geometry) as geometry, aza, ooaza_name, city_name FROM merged GROUP BY aza, ooaza_name, city_name"
-
-          tippecanoe -e "$AZA_DIR" \
-            --no-tile-compression \
-            -z14 -Z14 \
-            --no-tile-size-limit --no-feature-limit \
-            -l aza \
-            --no-simplification-of-shared-nodes \
-            --detect-shared-borders \
-            processed/merged_aza_dissolved.fgb
-
-          # 大字レイヤー（ズームレベル）
-          OOAZA_DIR="$BASE_TILES_DIR/ooaza_temp"
-          mkdir -p "$OOAZA_DIR"
+          # 各レイヤーの生成
+          for layer in config['layers']:
+              layer_name = layer['name']
+              zoom_levels = layer['zoom_levels']
+              temp_dir = f"{base_tiles_dir}/{layer_name}_temp"
+              os.makedirs(temp_dir, exist_ok=True)
+              
+              input_file = 'processed/merged.fgb'
+              
+              # ディゾルブが必要な場合は実行
+              if 'dissolve_fields' in layer:
+                  dissolved_file = f"processed/merged_{layer_name}_dissolved.fgb"
+                  input_file = create_dissolved_layer(
+                      'processed/merged.fgb',
+                      dissolved_file,
+                      layer['dissolve_fields'],
+                      layer_name
+                  )
+              
+              # タイル生成
+              generate_tile_layer(
+                  input_file,
+                  temp_dir,
+                  layer_name,
+                  zoom_levels['min'],
+                  zoom_levels['max'],
+                  layer.get('options', {})
+              )
           
-          ogr2ogr -f FlatGeobuf \
-            processed/merged_ooaza_dissolved.fgb \
-            processed/merged.fgb \
-            -dialect sqlite \
-            -sql "SELECT ST_Union(geometry) as geometry, ooaza_name, city_name FROM merged GROUP BY ooaza_name, city_name"
-
-          tippecanoe -e "$OOAZA_DIR" \
-            --no-tile-compression \
-            -z13 -Z13 \
-            --no-tile-size-limit --no-feature-limit \
-            -l ooaza \
-            --no-simplification-of-shared-nodes \
-            --detect-shared-borders \
-            processed/merged_ooaza_dissolved.fgb
-
           # タイルの統合
-          FINAL_TILES_DIR="$BASE_TILES_DIR/combined"
-          mkdir -p "$FINAL_TILES_DIR"
+          final_tiles_dir = f"{base_tiles_dir}/combined"
+          os.makedirs(final_tiles_dir, exist_ok=True)
           
-          # 各ズームレベルのタイルを適切なディレクトリにコピー
-          cp -r "$DETAIL_DIR"/* "$FINAL_TILES_DIR/"
-          cp -r "$AZA_DIR"/* "$FINAL_TILES_DIR/"
-          cp -r "$OOAZA_DIR"/* "$FINAL_TILES_DIR/"
-          
-          # 一時ディレクトリの削除
-          rm -rf "$DETAIL_DIR" "$AZA_DIR" "$OOAZA_DIR"
+          # 各レイヤーのタイルを統合
+          for layer in config['layers']:
+              temp_dir = f"{base_tiles_dir}/{layer_name}_temp"
+              subprocess.run(['cp', '-r', f"{temp_dir}/", final_tiles_dir])
+              subprocess.run(['rm', '-rf', temp_dir])
           
           # 最終的なタイルディレクトリを移動
-          rm -rf "$BASE_TILES_DIR/tiles"
-          mv "$FINAL_TILES_DIR" "$BASE_TILES_DIR/tiles"
-
-          # 各ズームレベルのタイルの最大ファイルサイズを分析
-          echo "Analyzing maximum tile sizes for each zoom level..."
-          {
-            echo "zoom_level,max_size_bytes"
-            for zoom_dir in "$BASE_TILES_DIR"/tiles/*; do
-              if [ -d "$zoom_dir" ]; then
-                zoom_level=$(basename "$zoom_dir")
-                # findコマンドで最大のファイルサイズを取得
-                max_size=$(find "$zoom_dir" -type f -name "*.pbf" -printf "%s\n" | sort -nr | head -n1)
-                if [ ! -z "$max_size" ]; then
-                  echo "$zoom_level,$max_size"
-                fi
-              fi
-            done
-          } > "$BASE_TILES_DIR/tile_sizes.csv"
+          subprocess.run(['rm', '-rf', f"{base_tiles_dir}/tiles"])
+          subprocess.run(['mv', final_tiles_dir, f"{base_tiles_dir}/tiles"])
+          
+          # タイルサイズの分析
+          with open(f"{base_tiles_dir}/tile_sizes.csv", 'w') as f:
+              f.write("zoom_level,max_size_bytes\n")
+              for zoom_dir in os.listdir(f"{base_tiles_dir}/tiles"):
+                  zoom_path = os.path.join(f"{base_tiles_dir}/tiles", zoom_dir)
+                  if os.path.isdir(zoom_path):
+                      # 最大ファイルサイズを取得
+                      result = subprocess.run(
+                          ['find', zoom_path, '-type', 'f', '-name', '*.pbf', '-printf', '%s\n'],
+                          capture_output=True,
+                          text=True
+                      )
+                      if result.stdout:
+                          max_size = max(map(int, result.stdout.strip().split('\n')))
+                          f.write(f"{zoom_dir},{max_size}\n")
+          EOF
 
       - name: Copy tiles to destination
         run: |
