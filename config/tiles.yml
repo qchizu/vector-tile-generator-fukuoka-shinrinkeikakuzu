@@ -32,3 +32,14 @@ layers:
       options:
         detect_shared_borders: true
         no_simplification_shared_nodes: true
+
+    # 市町村レイヤー（市町村ごとにディゾルブ）
+    - name: muni
+      zoom_levels:
+        min: 2
+        max: 12
+      dissolve_fields:
+        - city_name
+      options:
+        detect_shared_borders: true
+        no_simplification_shared_nodes: true
