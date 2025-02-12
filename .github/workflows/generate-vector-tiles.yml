@@ -227,13 +227,26 @@ jobs:
           
           # 各レイヤーのタイルを統合
           for layer in config['layers']:
+              layer_name = layer['name']
               temp_dir = f"{base_tiles_dir}/{layer_name}_temp"
-              subprocess.run(['cp', '-r', f"{temp_dir}/", final_tiles_dir])
-              subprocess.run(['rm', '-rf', temp_dir])
+              # ディレクトリ内のすべてのファイルとディレクトリをコピー
+              for item in os.listdir(temp_dir):
+                  src = os.path.join(temp_dir, item)
+                  dst = os.path.join(final_tiles_dir, item)
+                  if os.path.isdir(src):
+                      subprocess.run(['cp', '-r', src, dst], check=True)
+                  else:
+                      subprocess.run(['cp', src, dst], check=True)
+          
+          # 一時ディレクトリの削除
+          for layer in config['layers']:
+              layer_name = layer['name']
+              temp_dir = f"{base_tiles_dir}/{layer_name}_temp"
+              subprocess.run(['rm', '-rf', temp_dir], check=True)
           
           # 最終的なタイルディレクトリを移動
-          subprocess.run(['rm', '-rf', f"{base_tiles_dir}/tiles"])
-          subprocess.run(['mv', final_tiles_dir, f"{base_tiles_dir}/tiles"])
+          subprocess.run(['rm', '-rf', f"{base_tiles_dir}/tiles"], check=True)
+          subprocess.run(['mv', final_tiles_dir, f"{base_tiles_dir}/tiles"], check=True)
           
           # タイルサイズの分析
           with open(f"{base_tiles_dir}/tile_sizes.csv", 'w') as f:
