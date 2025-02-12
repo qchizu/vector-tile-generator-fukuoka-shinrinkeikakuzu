@@ -1,0 +1,16 @@
+{
+"name": "processed/tiles/muni_temp",
+"description": "muni",
+"version": "2",
+"minzoom": "2",
+"maxzoom": "12",
+"center": "130.649414,33.174334,12",
+"bounds": "130.031733,33.001862,131.182500,34.249767",
+"antimeridian_adjusted_bounds": "130.031733,33.001862,131.182500,34.249767",
+"type": "overlay",
+"strategies": "[{},{},{\"tiny_polygons\":64},{\"tiny_polygons\":64},{\"tiny_polygons\":64},{\"tiny_polygons\":64},{\"tiny_polygons\":64},{\"tiny_polygons\":64},{\"tiny_polygons\":82},{\"tiny_polygons\":86},{\"tiny_polygons\":73},{\"tiny_polygons\":53},{\"tiny_polygons\":33}]",
+"format": "pbf",
+"generator": "tippecanoe v2.75.1",
+"generator_options": "tippecanoe -e processed/tiles/muni_temp --no-tile-compression -z12 -Z2 --no-tile-size-limit --no-feature-limit -l muni --description muni --detect-shared-borders --no-simplification-of-shared-nodes processed/merged_muni_dissolved.fgb",
+"json": "{\"vector_layers\":[{\"id\":\"muni\",\"description\":\"\",\"minzoom\":2,\"maxzoom\":12,\"fields\":{\"city_name\":\"String\"}}],\"tilestats\":{\"layerCount\":1,\"layers\":[{\"layer\":\"muni\",\"count\":64,\"geometry\":\"Polygon\",\"attributeCount\":1,\"attributes\":[{\"attribute\":\"city_name\",\"count\":64,\"type\":\"string\",\"values\":[\"うきは市\",\"みやこ町\",\"みやま市\",\"上毛町\",\"中間市\",\"久山町\",\"久留米市\",\"八女市\",\"北九州市八幡東区\",\"北九州市八幡西区\",\"北九州市小倉北区\",\"北九州市小倉南区\",\"北九州市若松区\",\"北九州市門司区\",\"古賀市\",\"嘉麻市\",\"大任町\",\"大牟田市\",\"大野城市\",\"太宰府市\",\"宇美町\",\"宗像市\",\"宮若市\",\"小竹町\",\"小郡市\",\"岡垣町\",\"川崎町\",\"広川町\",\"志免町\",\"新宮町\",\"春日市\",\"朝倉市\",\"東峰村\",\"桂川町\",\"水巻町\",\"添田町\",\"田川市\",\"直方市\",\"福岡市南区\",\"福岡市博多区\",\"福岡市城南区\",\"福岡市早良区\",\"福岡市東区\",\"福岡市西区\",\"福智町\",\"福津市\",\"筑前町\",\"筑紫野市\",\"築上町\",\"篠栗町\",\"粕屋町\",\"糸島市\",\"糸田町\",\"芦屋町\",\"苅田町\",\"行橋市\",\"豊前市\",\"赤村\",\"遠賀町\",\"那珂川市\",\"鞍手町\",\"須恵町\",\"飯塚市\",\"香春町\"]}]}]}}"
+}

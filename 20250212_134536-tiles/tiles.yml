@@ -1,0 +1,45 @@
+layers:
+    # 詳細レイヤー（全ての属性を保持）
+    - name: detail
+      zoom_levels:
+        min: 15
+        max: 15
+      options:
+        detect_shared_borders: false
+        no_simplification_shared_nodes: false
+  
+    # 字レイヤー（字ごとにディゾルブ）
+    - name: aza
+      zoom_levels:
+        min: 14
+        max: 14
+      dissolve_fields:
+        - aza
+        - ooaza_name
+        - city_name
+      options:
+        detect_shared_borders: true
+        no_simplification_shared_nodes: true
+  
+    # 大字レイヤー（大字ごとにディゾルブ）
+    - name: ooaza
+      zoom_levels:
+        min: 13
+        max: 13
+      dissolve_fields:
+        - ooaza_name
+        - city_name
+      options:
+        detect_shared_borders: true
+        no_simplification_shared_nodes: true
+
+    # 市町村レイヤー（市町村ごとにディゾルブ）
+    - name: muni
+      zoom_levels:
+        min: 2
+        max: 12
+      dissolve_fields:
+        - city_name
+      options:
+        detect_shared_borders: true
+        no_simplification_shared_nodes: true
