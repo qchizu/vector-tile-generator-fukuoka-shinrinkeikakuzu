@@ -25,28 +25,38 @@ jobs:
           chmod 600 ~/.ssh/deploy_key
           eval "$(ssh-agent -s)"
           
-          # SSH_ASKPASSを使用して非対話的にパスフレーズを提供
+          # SSH_ASKPASSスクリプトの作成
           echo '#!/bin/bash' > ~/ps-entry
           echo "echo '$SSH_PASSPHRASE'" >> ~/ps-entry
           chmod +x ~/ps-entry
           
-          SSH_ASKPASS=~/ps-entry DISPLAY=:0 ssh-add ~/.ssh/deploy_key < /dev/null
+          # SSHエージェントへの鍵の追加
+          DISPLAY=:0 SSH_ASKPASS=~/ps-entry ssh-add ~/.ssh/deploy_key < /dev/null
           
+          # SSH設定
           echo -e "Host deploy_host\n\
             HostName ${{ secrets.SSH_HOST }}\n\
             User ${{ secrets.SSH_USER }}\n\
             Port ${{ secrets.SSH_PORT }}\n\
             IdentityFile ~/.ssh/deploy_key\n\
             StrictHostKeyChecking no\n\
-            UserKnownHostsFile=/dev/null" > ~/.ssh/config
+            UserKnownHostsFile=/dev/null\n\
+            PreferredAuthentications publickey" > ~/.ssh/config
           chmod 600 ~/.ssh/config
 
       - name: Test SSH Connection
-        run: ssh -v deploy_host 'echo "SSH connection successful"'
+        env:
+          DISPLAY: :0
+          SSH_ASKPASS: ~/ps-entry
+        run: |
+          setsid ssh -v deploy_host 'echo "SSH connection successful"'
 
       - name: Deploy to Server
+        env:
+          DISPLAY: :0
+          SSH_ASKPASS: ~/ps-entry
         run: |
-          rsync -rltvz --delete \
+          setsid rsync -rltzv --delete \
             -e "ssh -v" \
             "${{ github.event.inputs.source_dir }}/" \
             "deploy_host:${{ github.event.inputs.target_dir }}/"
