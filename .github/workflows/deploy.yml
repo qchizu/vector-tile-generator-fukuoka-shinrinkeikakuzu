@@ -23,10 +23,15 @@ jobs:
           mkdir -p ~/.ssh
           echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/deploy_key
           chmod 600 ~/.ssh/deploy_key
-          ssh-keygen -y -f ~/.ssh/deploy_key -P "$SSH_PASSPHRASE" > ~/.ssh/deploy_key.pub
-          chmod 644 ~/.ssh/deploy_key.pub
           eval "$(ssh-agent -s)"
-          echo "$SSH_PASSPHRASE" | ssh-add ~/.ssh/deploy_key
+          
+          # SSH_ASKPASSを使用して非対話的にパスフレーズを提供
+          echo '#!/bin/bash' > ~/ps-entry
+          echo "echo '$SSH_PASSPHRASE'" >> ~/ps-entry
+          chmod +x ~/ps-entry
+          
+          SSH_ASKPASS=~/ps-entry DISPLAY=:0 ssh-add ~/.ssh/deploy_key < /dev/null
+          
           echo -e "Host deploy_host\n\
             HostName ${{ secrets.SSH_HOST }}\n\
             User ${{ secrets.SSH_USER }}\n\
