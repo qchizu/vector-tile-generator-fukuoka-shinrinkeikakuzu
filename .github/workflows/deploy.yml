@@ -1,5 +1,4 @@
 name: Deploy to Server
-
 on:
   workflow_dispatch:
     inputs:
@@ -11,18 +10,20 @@ on:
         description: 'Target directory on server'
         required: true
         default: '/var/www/html'
-
 jobs:
   deploy:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-
       - name: Setup SSH
+        env:
+          SSH_PASSPHRASE: ${{ secrets.SSH_PASSPHRASE }}
         run: |
           mkdir -p ~/.ssh
           echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/deploy_key
           chmod 600 ~/.ssh/deploy_key
+          eval "$(ssh-agent -s)"
+          echo "$SSH_PASSPHRASE" | ssh-add ~/.ssh/deploy_key
           echo -e "Host deploy_host\n\
             HostName ${{ secrets.SSH_HOST }}\n\
             User ${{ secrets.SSH_USER }}\n\
@@ -30,7 +31,6 @@ jobs:
             IdentityFile ~/.ssh/deploy_key\n\
             StrictHostKeyChecking no\n\
             UserKnownHostsFile=/dev/null" > ~/.ssh/config
-
       - name: Deploy to Server
         run: |
           rsync -rltzv --delete \
