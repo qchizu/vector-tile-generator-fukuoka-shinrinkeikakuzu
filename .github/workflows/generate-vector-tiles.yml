@@ -283,13 +283,13 @@ jobs:
               json.dump(layers_info, f, indent=2)
           EOF
           
-          - name: Generate style.json
-                  run: |
-                    # スクリプトディレクトリの作成
-                    mkdir -p scripts
-                    
-                    # style_generator.pyの作成
-                    cat > scripts/style_generator.py << 'EOF'
+      - name: Generate style.json
+        run: |
+          # スクリプトディレクトリの作成
+          mkdir -p scripts
+          
+          # style_generator.pyの作成
+          cat > scripts/style_generator.py << 'EOF'
           import yaml
           import json
           import os
