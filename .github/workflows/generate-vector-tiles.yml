@@ -324,7 +324,13 @@ jobs:
               for layer in config['layers']:
                   layer_name = layer['name']
                   min_zoom = layer['zoom_levels']['min']
-                  max_zoom = layer['zoom_levels']['max']
+                  
+                  # maxzoomの設定
+                  # detailレイヤーの場合は21固定、それ以外はconfig値+1
+                  if layer_name == 'detail':
+                      max_zoom = 21
+                  else:
+                      max_zoom = layer['zoom_levels']['max'] + 1
                   
                   # ラベルフィールドの決定
                   label_field = layer.get('label_field', layer['name'])
