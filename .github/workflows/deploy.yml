@@ -1,4 +1,4 @@
-name: Deploy Directory to Server
+name: Deploy to Server
 
 on:
   workflow_dispatch:
@@ -6,38 +6,33 @@ on:
       source_dir:
         description: 'Source directory to upload'
         required: true
-        type: string
-      destination_dir:
-        description: 'Destination directory on server'
+        default: 'dist'
+      target_dir:
+        description: 'Target directory on server'
         required: true
-        type: string
+        default: '/var/www/html'
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
-    
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Install SSH key
+      - name: Setup SSH
         run: |
           mkdir -p ~/.ssh
           echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/deploy_key
           chmod 600 ~/.ssh/deploy_key
-          echo "StrictHostKeyChecking no" > ~/.ssh/config
+          echo -e "Host deploy_host\n\
+            HostName ${{ secrets.SSH_HOST }}\n\
+            User ${{ secrets.SSH_USER }}\n\
+            Port ${{ secrets.SSH_PORT }}\n\
+            IdentityFile ~/.ssh/deploy_key\n\
+            StrictHostKeyChecking no\n\
+            UserKnownHostsFile=/dev/null" > ~/.ssh/config
 
-      - name: Deploy to server
-        env:
-          SSH_HOST: ${{ secrets.SSH_HOST }}
-          SSH_PORT: ${{ secrets.SSH_PORT }}
-          SSH_USER: ${{ secrets.SSH_USERNAME }}
-          SOURCE_DIR: ${{ github.workspace }}/${{ inputs.source_dir }}
-          DEST_DIR: ${{ inputs.destination_dir }}
+      - name: Deploy to Server
         run: |
-          rsync -avz -e "ssh -p $SSH_PORT -i ~/.ssh/deploy_key" \
-            $SOURCE_DIR $SSH_USER@$SSH_HOST:$DEST_DIR
-
-      - name: Cleanup
-        if: always()
-        run: rm -f ~/.ssh/deploy_key
+          rsync -rltzv --delete \
+            "${{ github.event.inputs.source_dir }}/" \
+            "deploy_host:${{ github.event.inputs.target_dir }}/"
