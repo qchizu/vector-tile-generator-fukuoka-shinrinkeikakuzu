@@ -1,45 +1,58 @@
-layers:
-    # 詳細レイヤー（全ての属性を保持）
-    - name: detail
-      zoom_levels:
-        min: 15
-        max: 15
-      options:
-        detect_shared_borders: false
-        no_simplification_shared_nodes: false
-  
-    # 字レイヤー（字ごとにディゾルブ）
-    - name: aza
-      zoom_levels:
-        min: 14
-        max: 14
-      dissolve_fields:
-        - aza
-        - ooaza_name
-        - city_name
-      options:
-        detect_shared_borders: true
-        no_simplification_shared_nodes: true
-  
-    # 大字レイヤー（大字ごとにディゾルブ）
-    - name: ooaza_name
-      zoom_levels:
-        min: 13
-        max: 13
-      dissolve_fields:
-        - ooaza_name
-        - city_name
-      options:
-        detect_shared_borders: true
-        no_simplification_shared_nodes: true
+# スタイル設定
+style:
+  name: "vector-tiles-map"  # style.jsonのname
+  color:
+    fill: "rgb(50, 205, 50)"    # 塗りつぶし色
+    line: "rgb(0, 100, 0)"      # 線の色
+    text: "rgb(0, 100, 0)"      # テキストの色
+  detail_field: "name"          # 詳細レイヤーで表示するフィールド名
 
-    # 市町村レイヤー（市町村ごとにディゾルブ）
-    - name: city_name
-      zoom_levels:
-        min: 2
-        max: 12
-      dissolve_fields:
-        - city_name
-      options:
-        detect_shared_borders: true
-        no_simplification_shared_nodes: true
+# レイヤー設定
+layers:
+  # 詳細レイヤー（全ての属性を保持）
+  - name: detail
+    zoom_levels:
+      min: 15
+      max: 15
+    options:
+      detect_shared_borders: false
+      no_simplification_shared_nodes: false
+
+  # 字レイヤー（字ごとにディゾルブ）
+  - name: aza
+    zoom_levels:
+      min: 14
+      max: 14
+    dissolve_fields:
+      - aza
+      - ooaza_name
+      - city_name
+    label_field: "aza"  # ラベルとして使用するフィールド
+    options:
+      detect_shared_borders: true
+      no_simplification_shared_nodes: true
+
+  # 大字レイヤー（大字ごとにディゾルブ）
+  - name: ooaza
+    zoom_levels:
+      min: 13
+      max: 13
+    dissolve_fields:
+      - ooaza_name
+      - city_name
+    label_field: "ooaza_name"
+    options:
+      detect_shared_borders: true
+      no_simplification_shared_nodes: true
+
+  # 市町村レイヤー（市町村ごとにディゾルブ）
+  - name: muni
+    zoom_levels:
+      min: 2
+      max: 12
+    dissolve_fields:
+      - city_name
+    label_field: "city_name"
+    options:
+      detect_shared_borders: true
+      no_simplification_shared_nodes: true
