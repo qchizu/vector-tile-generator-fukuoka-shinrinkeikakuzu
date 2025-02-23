@@ -1,0 +1,83 @@
+{
+  "timestamp": "20250223_154919",
+  "layers": [
+    {
+      "name": "detail",
+      "zoom_levels": {
+        "min": 15,
+        "max": 15
+      },
+      "dissolve_fields": [],
+      "options": {
+        "detect-shared-borders": false,
+        "no-simplification-of-shared-nodes": false
+      }
+    },
+    {
+      "name": "aza",
+      "zoom_levels": {
+        "min": 14,
+        "max": 14
+      },
+      "dissolve_fields": [
+        "aza",
+        "ooaza_name",
+        "city_name",
+        "keikakuku_"
+      ],
+      "options": {
+        "detect-shared-borders": true,
+        "no-simplification-of-shared-nodes": true
+      }
+    },
+    {
+      "name": "ooaza",
+      "zoom_levels": {
+        "min": 13,
+        "max": 13
+      },
+      "dissolve_fields": [
+        "ooaza_name",
+        "city_name",
+        "keikakuku_"
+      ],
+      "options": {
+        "detect-shared-borders": true,
+        "no-simplification-of-shared-nodes": true
+      }
+    },
+    {
+      "name": "city_name",
+      "zoom_levels": {
+        "min": 10,
+        "max": 12
+      },
+      "dissolve_fields": [
+        "city_name",
+        "keikakuku_"
+      ],
+      "options": {
+        "detect-shared-borders": true,
+        "no-simplification-of-shared-nodes": true,
+        "full-detail": 10,
+        "low-detail": 10
+      }
+    },
+    {
+      "name": "keikakuku_",
+      "zoom_levels": {
+        "min": 2,
+        "max": 10
+      },
+      "dissolve_fields": [
+        "keikakuku_"
+      ],
+      "options": {
+        "detect-shared-borders": true,
+        "no-simplification-of-shared-nodes": true,
+        "full-detail": 10,
+        "low-detail": 10
+      }
+    }
+  ]
+}
