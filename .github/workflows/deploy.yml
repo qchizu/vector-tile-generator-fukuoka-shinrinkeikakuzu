@@ -15,12 +15,14 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      
       - name: Setup SSH
         env:
           SSH_PASSPHRASE: ${{ secrets.SSH_PASSPHRASE }}
         run: |
           mkdir -p ~/.ssh
           echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/deploy_key
+          ssh-keygen -y -f ~/.ssh/deploy_key -P "$SSH_PASSPHRASE" > ~/.ssh/deploy_key.pub
           chmod 600 ~/.ssh/deploy_key
           eval "$(ssh-agent -s)"
           echo "$SSH_PASSPHRASE" | ssh-add ~/.ssh/deploy_key
@@ -31,8 +33,13 @@ jobs:
             IdentityFile ~/.ssh/deploy_key\n\
             StrictHostKeyChecking no\n\
             UserKnownHostsFile=/dev/null" > ~/.ssh/config
+
+      - name: Test SSH Connection
+        run: ssh -v deploy_host 'echo "SSH connection successful"'
+
       - name: Deploy to Server
         run: |
-          rsync -rltzv --delete \
+          rsync -rltvz --delete \
+            -e "ssh -v" \
             "${{ github.event.inputs.source_dir }}/" \
             "deploy_host:${{ github.event.inputs.target_dir }}/"
