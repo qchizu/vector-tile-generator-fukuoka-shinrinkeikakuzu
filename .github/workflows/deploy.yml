@@ -25,38 +25,41 @@ jobs:
           chmod 600 ~/.ssh/deploy_key
           eval "$(ssh-agent -s)"
           
-          # SSH_ASKPASSスクリプトの作成
-          echo '#!/bin/bash' > ~/ps-entry
-          echo "echo '$SSH_PASSPHRASE'" >> ~/ps-entry
-          chmod +x ~/ps-entry
+          # SSH_ASKPASSスクリプトの作成（絶対パスを使用）
+          SCRIPT_PATH="${HOME}/ps-entry"
+          echo '#!/bin/bash' > "${SCRIPT_PATH}"
+          echo "echo '${SSH_PASSPHRASE}'" >> "${SCRIPT_PATH}"
+          chmod +x "${SCRIPT_PATH}"
           
           # SSHエージェントへの鍵の追加
-          DISPLAY=:0 SSH_ASKPASS=~/ps-entry ssh-add ~/.ssh/deploy_key < /dev/null
+          export DISPLAY=:0
+          export SSH_ASKPASS="${SCRIPT_PATH}"
+          setsid -w ssh-add ~/.ssh/deploy_key < /dev/null
           
           # SSH設定
-          echo -e "Host deploy_host\n\
-            HostName ${{ secrets.SSH_HOST }}\n\
-            User ${{ secrets.SSH_USER }}\n\
-            Port ${{ secrets.SSH_PORT }}\n\
-            IdentityFile ~/.ssh/deploy_key\n\
-            StrictHostKeyChecking no\n\
-            UserKnownHostsFile=/dev/null\n\
-            PreferredAuthentications publickey" > ~/.ssh/config
+          cat > ~/.ssh/config << EOF
+          Host deploy_host
+            HostName ${{ secrets.SSH_HOST }}
+            User ${{ secrets.SSH_USER }}
+            Port ${{ secrets.SSH_PORT }}
+            IdentityFile ~/.ssh/deploy_key
+            StrictHostKeyChecking no
+            UserKnownHostsFile=/dev/null
+            PreferredAuthentications publickey
+          EOF
           chmod 600 ~/.ssh/config
 
       - name: Test SSH Connection
-        env:
-          DISPLAY: :0
-          SSH_ASKPASS: ~/ps-entry
         run: |
-          setsid ssh -v deploy_host 'echo "SSH connection successful"'
-
+          export DISPLAY=:0
+          export SSH_ASKPASS="${HOME}/ps-entry"
+          setsid -w ssh deploy_host 'echo "SSH connection successful"'
+      
       - name: Deploy to Server
-        env:
-          DISPLAY: :0
-          SSH_ASKPASS: ~/ps-entry
         run: |
-          setsid rsync -rltzv --delete \
-            -e "ssh -v" \
+          export DISPLAY=:0
+          export SSH_ASKPASS="${HOME}/ps-entry"
+          setsid -w rsync -rltzv --delete \
+            -e "ssh" \
             "${{ github.event.inputs.source_dir }}/" \
             "deploy_host:${{ github.event.inputs.target_dir }}/"
