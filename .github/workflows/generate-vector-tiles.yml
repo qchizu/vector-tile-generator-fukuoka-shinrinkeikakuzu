@@ -282,9 +282,15 @@ jobs:
           with open(f"{base_tiles_dir}/tiles/layers_info.json", 'w') as f:
               json.dump(layers_info, f, indent=2)
           EOF
+          
       - name: Generate style.json
         run: |
-          python3 scripts/style_generator.py config/tiles.yml "${{ env.TIMESTAMP }}" "processed/tiles/tiles"
+          # style.jsonを直接タイムスタンプ付きディレクトリに生成
+          TEST_DIR="${{ env.TIMESTAMP }}-tiles"
+          python3 scripts/style_generator.py config/tiles.yml "${{ env.TIMESTAMP }}" "$TEST_DIR"
+          
+          # GitHub Pages用のディレクトリにコピー
+          cp "$TEST_DIR/style.json" "_site/$TEST_DIR/" 2>/dev/null || true
 
       - name: Copy tiles to destination
         run: |
@@ -322,9 +328,8 @@ jobs:
           git config --global user.name "GitHub Actions"
           git config --global user.email "actions@github.com"
           
+          # 変更をステージングに追加
           git add "${{ env.TIMESTAMP }}-tiles/"
-          git add "${{ env.TIMESTAMP }}-tiles/tile_sizes.csv"
-          git add "${{ env.TIMESTAMP }}-tiles/style.json"  # style.jsonを追加
           
           COMMIT_MSG="Update vector tiles - ${{ env.TIMESTAMP }}"
           
