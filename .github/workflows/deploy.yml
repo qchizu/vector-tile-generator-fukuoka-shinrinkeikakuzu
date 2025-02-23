@@ -22,8 +22,9 @@ jobs:
         run: |
           mkdir -p ~/.ssh
           echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/deploy_key
-          ssh-keygen -y -f ~/.ssh/deploy_key -P "$SSH_PASSPHRASE" > ~/.ssh/deploy_key.pub
           chmod 600 ~/.ssh/deploy_key
+          ssh-keygen -y -f ~/.ssh/deploy_key -P "$SSH_PASSPHRASE" > ~/.ssh/deploy_key.pub
+          chmod 644 ~/.ssh/deploy_key.pub
           eval "$(ssh-agent -s)"
           echo "$SSH_PASSPHRASE" | ssh-add ~/.ssh/deploy_key
           echo -e "Host deploy_host\n\
@@ -33,6 +34,7 @@ jobs:
             IdentityFile ~/.ssh/deploy_key\n\
             StrictHostKeyChecking no\n\
             UserKnownHostsFile=/dev/null" > ~/.ssh/config
+          chmod 600 ~/.ssh/config
 
       - name: Test SSH Connection
         run: ssh -v deploy_host 'echo "SSH connection successful"'
