@@ -22,7 +22,7 @@ layers:
         no_simplification_shared_nodes: true
   
     # 大字レイヤー（大字ごとにディゾルブ）
-    - name: ooaza
+    - name: ooaza_name
       zoom_levels:
         min: 13
         max: 13
@@ -34,7 +34,7 @@ layers:
         no_simplification_shared_nodes: true
 
     # 市町村レイヤー（市町村ごとにディゾルブ）
-    - name: muni
+    - name: city_name
       zoom_levels:
         min: 2
         max: 12
