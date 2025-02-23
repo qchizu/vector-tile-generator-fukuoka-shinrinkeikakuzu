@@ -282,6 +282,9 @@ jobs:
           with open(f"{base_tiles_dir}/tiles/layers_info.json", 'w') as f:
               json.dump(layers_info, f, indent=2)
           EOF
+      - name: Generate style.json
+        run: |
+          python3 scripts/style_generator.py config/tiles.yml "${{ env.TIMESTAMP }}" "processed/tiles/tiles"
 
       - name: Copy tiles to destination
         run: |
@@ -292,6 +295,7 @@ jobs:
           cp processed/tiles/tile_sizes.csv "$TEST_DIR/"
           cp processed/tiles/tiles/tiles.yml "$TEST_DIR/"
           cp processed/tiles/tiles/layers_info.json "$TEST_DIR/" 2>/dev/null || true
+          cp processed/tiles/tiles/style.json "$TEST_DIR/" 2>/dev/null || true
           
           # GitHub Pages用
           mkdir -p "_site/$TEST_DIR"
@@ -299,6 +303,7 @@ jobs:
           cp processed/tiles/tile_sizes.csv "_site/$TEST_DIR/"
           cp processed/tiles/tiles/tiles.yml "_site/$TEST_DIR/"
           cp processed/tiles/tiles/layers_info.json "_site/$TEST_DIR/" 2>/dev/null || true
+          cp processed/tiles/tiles/style.json "_site/$TEST_DIR/" 2>/dev/null || true
 
       - name: Setup Pages
         uses: actions/configure-pages@v4
