@@ -1,11 +1,11 @@
 # スタイル設定
 style:
-  name: "vector-tiles-map"  # style.jsonのname
+  name: "fukuoka-shinrinkeikakuzu"  # style.jsonのname
   color:
     fill: "rgb(50, 205, 50)"    # 塗りつぶし色
     line: "rgb(0, 100, 0)"      # 線の色
     text: "rgb(0, 100, 0)"      # テキストの色
-  detail_field: "name"          # 詳細レイヤーで表示するフィールド名
+  detail_field: "link_key"          # 詳細レイヤーで表示するフィールド名
 
 # レイヤー設定
 layers:
@@ -27,6 +27,7 @@ layers:
       - aza
       - ooaza_name
       - city_name
+      - keikakuku_
     label_field: "aza"  # ラベルとして使用するフィールド
     options:
       detect_shared_borders: true
@@ -40,19 +41,35 @@ layers:
     dissolve_fields:
       - ooaza_name
       - city_name
+      - keikakuku_
     label_field: "ooaza_name"
     options:
       detect_shared_borders: true
       no_simplification_shared_nodes: true
 
   # 市町村レイヤー（市町村ごとにディゾルブ）
-  - name: muni
+  - name: city_name
     zoom_levels:
-      min: 2
+      min: 10
       max: 12
     dissolve_fields:
       - city_name
+      - keikakuku_
     label_field: "city_name"
     options:
       detect_shared_borders: true
       no_simplification_shared_nodes: true
+      full-detail: 10
+      
+  # 計画区レイヤー（計画区ごとにディゾルブ）
+  - name: keikakuku_
+    zoom_levels:
+      min: 2
+      max: 10
+    dissolve_fields:
+      - keikakuku_
+    label_field: "keikakuku_"
+    options:
+      detect_shared_borders: true
+      no_simplification_shared_nodes: true
+      full-detail: 10
