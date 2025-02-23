@@ -15,8 +15,8 @@ layers:
       min: 15
       max: 15
     options:
-      detect_shared_borders: false
-      no_simplification_shared_nodes: false
+      detect-shared-borders: false
+      no-simplification-of-shared-nodes: false
 
   # 字レイヤー（字ごとにディゾルブ）
   - name: aza
@@ -30,8 +30,8 @@ layers:
       - keikakuku_
     label_field: "aza"  # ラベルとして使用するフィールド
     options:
-      detect_shared_borders: true
-      no_simplification_shared_nodes: true
+      detect-shared-borders: true
+      no-simplification-of-shared-nodes: true
 
   # 大字レイヤー（大字ごとにディゾルブ）
   - name: ooaza
@@ -44,8 +44,8 @@ layers:
       - keikakuku_
     label_field: "ooaza_name"
     options:
-      detect_shared_borders: true
-      no_simplification_shared_nodes: true
+      detect-shared-borders: true
+      no-simplification-of-shared-nodes: true
 
   # 市町村レイヤー（市町村ごとにディゾルブ）
   - name: city_name
@@ -57,9 +57,10 @@ layers:
       - keikakuku_
     label_field: "city_name"
     options:
-      detect_shared_borders: true
-      no_simplification_shared_nodes: true
+      detect-shared-borders: true
+      no-simplification-of-shared-nodes: true
       full-detail: 10
+      low-detail: 10
       
   # 計画区レイヤー（計画区ごとにディゾルブ）
   - name: keikakuku_
@@ -70,6 +71,7 @@ layers:
       - keikakuku_
     label_field: "keikakuku_"
     options:
-      detect_shared_borders: true
-      no_simplification_shared_nodes: true
+      detect-shared-borders: true
+      no-simplification-of-shared-nodes: true
       full-detail: 10
+      low-detail: 10
