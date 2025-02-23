@@ -224,13 +224,19 @@ jobs:
           for layer in config['layers']:
               layer_name = layer['name']
               temp_dir = f"{base_tiles_dir}/{layer_name}_temp"
-              # ディレクトリ内のすべてのファイルとディレクトリをコピー
+              # metadata.jsonをズームレベルに応じてリネームしてからコピー
               for item in os.listdir(temp_dir):
                   src = os.path.join(temp_dir, item)
-                  dst = os.path.join(final_tiles_dir, item)
                   if os.path.isdir(src):
-                      subprocess.run(['cp', '-r', src, dst], check=True)
+                      # ディレクトリの場合はそのままコピー
+                      subprocess.run(['cp', '-r', src, final_tiles_dir], check=True)
                   else:
+                      # ファイルの場合、metadata.jsonなら特別な処理
+                      if item == "metadata.json":
+                          zoom_levels = layer['zoom_levels']
+                          dst = os.path.join(final_tiles_dir, f"metadata_z{zoom_levels['min']}-{zoom_levels['max']}.json")
+                      else:
+                          dst = os.path.join(final_tiles_dir, item)
                       subprocess.run(['cp', src, dst], check=True)
           
           # 一時ディレクトリの削除
