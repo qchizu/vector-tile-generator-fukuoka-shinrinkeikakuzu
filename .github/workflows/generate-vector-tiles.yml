@@ -160,15 +160,22 @@ jobs:
                   '--no-tile-size-limit',
                   '--no-feature-limit',
                   '-l', layer_name,
-                  '--description', layer_name  # レイヤーの説明としてレイヤー名を使用
+                  '--description', layer_name
               ]
               
-              # 追加オプションがある場合は追加
+              # オプションの処理
               if options:
-                  if options.get('detect_shared_borders', False):
-                      tippecanoe_cmd.extend(['--detect-shared-borders'])
-                  if options.get('no_simplification_shared_nodes', False):
-                      tippecanoe_cmd.extend(['--no-simplification-of-shared-nodes'])
+                  for option, value in options.items():
+                      # ハイフンの数を確認してオプション名を正規化
+                      option_name = f"--{option.replace('_', '-')}" if not option.startswith('-') else option
+                      
+                      # 真偽値の場合
+                      if isinstance(value, bool):
+                          if value:
+                              tippecanoe_cmd.append(option_name)
+                      # 数値または文字列の場合
+                      elif value is not None:
+                          tippecanoe_cmd.extend([option_name, str(value)])
               
               tippecanoe_cmd.append(input_file)
               
