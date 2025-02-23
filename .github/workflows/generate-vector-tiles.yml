@@ -324,6 +324,7 @@ jobs:
           
           git add "${{ env.TIMESTAMP }}-tiles/"
           git add "${{ env.TIMESTAMP }}-tiles/tile_sizes.csv"
+          git add "${{ env.TIMESTAMP }}-tiles/style.json"  # style.jsonを追加
           
           COMMIT_MSG="Update vector tiles - ${{ env.TIMESTAMP }}"
           
